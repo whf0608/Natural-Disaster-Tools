@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <link href="js/bootstrap.min.css">
+    <script src="js/jquery.min.js"></script>
+	<script src="js/bootstrap.min.js"></script>
+    <script src="js/jquery-3.6.3.min.js"></script>
+	<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+	<style>
+		img{width: 100px;height: 100px}
+		.dataset{padding: 10px}
+	</style>
+</head>
+<body>
+<nav class="navbar navbar-default" role="navigation">
+	<div class="container-fluid">
+	<div class="navbar-header">
+		<button type="button" class="navbar-toggle" data-toggle="collapse"
+				data-target="#example-navbar-collapse">
+			<span class="sr-only">导航</span>
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+		</button>
+		<a class="navbar-brand" href="index.html">导航</a>
+	</div>
+	<div class="collapse navbar-collapse" id="example-navbar-collapse">
+		<ul class="nav navbar-nav">
+			<li class="active"><a href="index.html">Datasets</a></li>
+			<li><a href="model.html">Models</a></li>
+			<li><a href="seach.html">Search</a></li>
+			<li><a href="map.html">Map</a></li>
+			<li><a href="canves.html">Labels Tools</a></li>
+			<li > <a id="server" class="rounded-pill" style="margin-left: 100px">Server</a></li>
+		</ul>
+	</div>
+	</div>
+</nav>
+
+
+<div  class="datasets_plane">
+<div >
+<button type="button" class="btn btn-primary" style="width: 100%;background-color: rgba(173,173,173,0.53)">datasets</button>
+</div>
+</div>
+
+</body>
+<script>
+$(document).ready(function(){
+	wscmd = new WebSocket("ws://192.168.210.107:8181/cmd/on");
+ 	wscmd.onopen = function(){
+ 	　　//当WebSocket创建成功时，触发onopen事件
+ 	   console.log("open");
+ 	   $("#server").css("background-color", "#5cb85c")
+	}
+
+	$("#btn").click(function(){
+		if (wscmd.OPEN) {
+			wscmd.send($("#input001").val())
+		}
+	  });
+
+	var wsdata = new WebSocket("ws://192.168.210.107:8181/data/show");
+
+	 function clck_fun(){
+		 if ($(this).parent().nextAll().length>1){
+			 $(this).parent().nextAll().remove()
+			 return
+		 }
+
+		button_this=$(this)
+		if (wsdata.OPEN){
+			wsdata.send(button_this.text());
+		}
+		// alert($(this).text())
+         r= Math.round(Math.random()*255)
+		 g=Math.round(Math.random()*255)
+		 b=Math.round(Math.random()*255)
+		 a=Math.random()
+		wsdata.onmessage = function(d){
+			json = JSON.parse(d.data)
+			datas = json[button_this.text()]
+			var imgs_plants=''
+			datas['imgs'].forEach(function (img){
+					imgs_plants+='<div class="col-sm-6 col-md-1">'+
+					'<a href="#" class="thumbnail">'+
+					'<img style="width: 150px;height: 100px" src="http://192.168.210.107:8081/'+img+'"'+
+					'alt="通用的占位符缩略图">'+
+					'</a>' +
+					'</div>'
+				})
+			if (imgs_plants.length>0){
+					button_this.parent().after('<div class="row">'+ imgs_plants+'</div>')
+				}
+
+			datas['path'].forEach(function (path){
+					 var btn_group =''
+					 for (k in path[1]) {
+						 if (path[1][k]){
+							 btn_group += '<div  class="v_btn" style=" float:left;background-color: green; width: 100px; height: 34px">'+k+'<div style="display:none;">'+JSON.stringify(path)+'</div></div>'
+						 }else{
+							 btn_group += '<div  class="v_btn" style=" float:left;background-color: red; width: 100px; height: 34px">'+k+'<div style="display:none;">'+JSON.stringify(path)+'</div></div>'
+
+						 }
+					 }
+					var context1  = '<div class="dataset">' +
+							'<div class="btn-group" style="width: 100%">'+
+							'<button type="button" class="f_btn btn btn-primary" style="background-color: rgb('+r+','+g+','+b+','+a+'); width: '+(80-datas['sub_level']*0)+'%">'+path[0]+'</button>'+
+							btn_group+
+							'</div></div>'
+					button_this.parent().after(context1)
+				})
+			}
+	 }
+	// $("button").on('click',clck_fun)
+	$('body').on('click', 'button',clck_fun);
+
+	$('.v_btn').unbind('click')
+	$('body').on('click', '.v_btn',function () {
+		var text = JSON.parse($(this).children().text())
+
+		if (wscmd.OPEN) {
+			if (text[1]['generate']){
+				alert('{"generate": "'+text[0]+'"}')
+				wscmd.send('{"generate": "'+text[0]+'"}')}
+
+			if (text[1]['vis']){
+				alert('{"vis": "'+text[0]+'"}')
+				wscmd.send('{"vis": "'+text[0]+'"}')}
+
+			}else {
+			alert('Command channel closed')
+		}
+		wscmd.onmessage = function(d){
+			alert(d.data)
+            alert(text[1]['vis'])
+			if (text[1]['vis']){
+			window.location.replace('http://192.168.210.107:8080/')
+			}
+		}
+
+	});
+
+	//
+});
+
+// $("button").unbind("click")
+// $("button").on("click",clck_fun)
+
+</script>
+</html>

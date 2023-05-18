@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no' />
+  <meta http-equiv="Access-Control-Allow-Origin" content="*" />
+  <title>Building damage visualizer</title>
+
+  <link href="css/leaflet.css" rel="stylesheet" />
+  <link href="css/easy-button.css" rel="stylesheet" />
+  <link href="css/font-awesome.min.css" rel="stylesheet" />
+<!--  <link href="css/noty.css" rel="stylesheet" />-->
+  <link href="css/leaflet.draw.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+        integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI="
+        crossorigin=""/>
+  <script src="js/jquery.min.js"></script>
+
+
+  <script src="https://cdn.bootcss.com/proj4js/2.4.3/proj4.js"></script>
+  <!-- Make sure you put this AFTER Leaflet's CSS -->
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+          integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM="
+          crossorigin=""></script>
+
+  <script src="https://cdn.bootcss.com/proj4leaflet/1.0.1/proj4leaflet.min.js"></script>
+
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+  <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+  <script src="js/tileLayer.baidu.js"></script>
+  <style>
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+  </style>
+
+</head>
+<body>
+<div id = "map" style = "width:100%; height:100%;"></div>
+<div style="position: absolute;top: 15px;right: 150px;z-index: 401;">
+  <button type="button" id="getgeojson">load Label</button>
+  <button type="button" onclick="getBbox();">获取bbox</button>
+  <div id="show_data" style="width: 150px"></div>
+</div>
+
+
+</body>
+
+<script>
+
+  map = new L.Map('map', { center: new L.LatLng(10,10), zoom: 10,crs: L.CRS.Baidu}),
+          drawnItems = L.featureGroup().addTo(map);
+
+  L.control.layers({
+            // 'osm': osm.addTo(map),
+            "百度地图": L.tileLayer.baidu({ layer: 'vec' }).addTo(map),
+            "百度卫星": L.tileLayer.baidu({ layer: 'img' }),
+            "百度pl": L.tileLayer.baidu({ layer: 'img_pl' })
+          },
+          { 'drawlayer': drawnItems },
+          { position: 'topright', collapsed: false }
+  ).addTo(map);
+
+  map.pm.addControls({
+    position: 'topleft',
+    drawCircle: false,
+  });
+
+  connect = function () {
+    wsmodel = new WebSocket("ws://192.168.210.107:8181/cmd/on");
+    wsmodel.onopen = function(){
+      $("#server").css("background-color", "#5cb85c")
+    }
+    wsmodel.onclose = function(e){
+      $(".server").css("background-color", "#c9302c")
+      console.log("cline success");
+    }
+    wsmodel.onerror = function(e){
+      $(".server").css("background-color", "#c9302c")
+    }
+    return wsmodel
+  }
+  wscmd = connect()
+  getBbox = function () {
+    self_drawn = map.pm.getGeomanDrawLayers(true).toGeoJSON()
+    // console.log(self_drawn)
+    c = self_drawn.features[0].geometry.coordinates[0]
+
+    if (wscmd.OPEN) {
+      alert('{"module":{"name":"tif_loc","arg":['+c[0][1]+','+ c[2][1]+','+ c[0][0]+','+ c[2][0]+']}}')
+      wscmd.send('{"module":{"name":"tif_loc","arg":['+c[0][1]+','+ c[2][1]+','+ c[0][0]+','+ c[2][0]+']}}')
+      wscmd.onmessage = function (data) {
+        context = '<div style="width:100%">'
+        // alert(data)
+        data = JSON.parse(data.data)
+        data = data['features']
+        for (k in data){
+          console.log(data[k])
+          context += '<ul class="list-group" style="float: left"><li class="list-group-item">'+
+                  '<input class="form-check-input me-1" type="checkbox" value="" >'+
+                  '<label class="form-check-label">'+data[k]['properties']['name']+'</label>'+
+                  '</li></ul>'
+          // '<div class="element"><button type="button" class="btn btn-success" style="margin: 10px">'+k+'</button> X</div>'
+        }
+        context+='</div>'
+
+        $("#show_data").html(context)
+      }
+    }else {
+      wscmd = connect()
+    }
+  }
+
+
+$(function () {
+  $("#getgeojson").click(function () {
+    geojson = map.pm.getGeomanDrawLayers(true).toGeoJSON()
+    coord={}
+    coord['coordinates']=geojson.features[0].geometry.coordinates[0]
+    zoom = map.getZoom()
+    coord["zoom"]=zoom
+    console.log(coord)
+    wscmd.send('{"module":{"name":"osm2geojson","arg":['+JSON.stringify(coord)+']}}')
+    wscmd.onmessage=function (d) {
+        response = JSON.parse(d.data)
+        myLayer = L.geoJSON().addTo(map);
+        myLayer.addData(response);
+        // $(".leaflet-zoom-animated").children().children().on('click', function(d) {
+        //   this.remove()
+        // });
+    }
+  })
+  // shuju("configs/55.48694_39.227708.geojson")
+})
+
+
+function shuju(data) {
+  $.ajax({
+    url: data,
+    async: false,
+    type: 'get',
+    dataType: 'json',
+    success: function (response) {
+      myLayer = L.geoJSON().addTo(map);
+      myLayer.addData(response);
+      myLayer.setStyle(function (feature){
+        if (feature['properties']['damaged']==0){
+          return {
+            fillColor: 'white',
+            weight: 1,
+            opacity: 1,
+            color: 'white',
+            dashArray: '3',
+            fillOpacity: 0.7
+          }
+        }
+        if (feature['properties']['damaged']==1){
+          return {
+            fillColor: 'red',
+            weight: 1,
+            opacity: 1,
+            color: 'red',
+            dashArray: '3',
+            fillOpacity: 0.7
+          }
+        }
+
+      })
+      $(".leaflet-zoom-animated").children().children().on('click', function(d) {
+        this.remove()
+      });
+    },
+    error: function(){
+      notifyFailMessage("Could not load configuration file", 10000);
+    }
+  });
+}
+
+</script>
+</html>

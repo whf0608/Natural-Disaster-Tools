@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+<div id="app">{{ message }}</div>
+<li v-for="item in items">
+    {{ item.message }}
+</li>
+
+<button @click="count++">Add 1</button>
+<p>Count is: {{ count }}</p>
+<script>
+    const { createApp } = Vue
+
+    createApp({
+        data() {
+            return {
+                count:0,
+                message: 'Hello Vue!',
+                parentMessage: 'Parent',
+                items: [{ message: 'Foo' }, { message: 'Bar' }]
+            }
+        }
+    }).mount('#app')
+
+
+</script>
+</body>
+</html>

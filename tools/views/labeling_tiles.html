@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="js/jquery.min.js"></script>
+    <link href="js/bootstrap.min.css">
+    <script src="js/bootstrap.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/svg.js/3.1.2/svg.min.js"></script>
+    <style>
+        button{
+            width: 100px;
+            height: 40px;
+            border-radius: 5px;
+            background-color: rgba(0,100,0,0.5);
+            border: #ff9200;
+            font-size: medium;
+        }
+    </style>
+</head>
+<body>
+<!--<img src="test.png" style="position: absolute; top: 10px;left: 10px">-->
+<!--<img src="phone_number.svg" style="width: 1000px;height: 800px; position: absolute; top: 10px;left: 10px;">-->
+<div class="img_show" style="width: 1000px;height: 1000px;position: absolute; top: 100px;left: 10px">
+<!--  <img src="test.png" style="position: absolute;width: 2500px;height: 2500px"></img>-->
+<!--  <object data="phone_number.svg" style="position: absolute"></object>-->
+</div>
+<div class="svg_show" style="position: absolute;top: 100px">
+</div>
+<div class="sild_show" style="position: fixed;top: 5%;width: 250px;right: 10px">
+</div>
+<input id="data_input" class="form-control" placeholder="" style="position:fixed;top:1%;right: 25%;width: 20%;height: 25px"></input>
+<input id="zoom_input" class="form-control" placeholder="20" style="position:fixed;top:1%;right: 20%; height: 20px;width: 50px"></input>
+<button class="search"  style="position:fixed;top:1%;right: 12%;height: 30px">Search</button>
+<button class=""  style="position:fixed;top:1%;right: 7%;height: 30px;width: 60px"><a  href="labeling_images.html">Swich</a></button>
+
+<button class="btn"  style="position: fixed;top: 70%">下一张图片</button>
+<button class="btn1"  style="position: fixed;top: 70%;left: 200px">上一张图片</button>
+<button class="btn2"  style="position: fixed;top: 70%;left: 400px">保存</button>
+<button class="btn3"  style="position: fixed;top: 70%;left: 600px">显示标签</button>
+<button class="btn4"  style="position: fixed;top: 70%;left: 800px">清空</button>
+
+</body>
+
+<script>
+    key_v={}
+    labels=['buildings', 'roads', 'trees', 'cars','ground', 'damaged_buildings', 'damaged_roads','damaged_ground', 'tents',' ']
+
+    elemts=[]
+    data0=[]
+    index=-1
+    pape_num=0
+    show_label_f=false
+    function show_svg(data) {
+        console.log("show svg")
+        console.log(data)
+        c=''
+        img_i=0
+        data[1].forEach(function (d) {
+            c+='<img src="'+d+'" style="position: absolute;left: '+256*(Math.trunc(img_i/4))+'px;top: '+256*(3-(img_i%4))+'px">'
+            img_i+=1
+        })
+
+        $(".img_show").html(c)
+
+        $(".svg_show").html(data[0])
+
+        $("svg").attr('opacity',0.3)
+
+        if (data[3]!=null){
+            var count=0
+            for (_ in data[3]){
+                count+=1
+            }
+            if (count>0){
+                key_v = data[3]
+                console.log(key_v)
+            }
+        }
+        var count=0
+        for (k in key_v){
+            count+=1
+        }
+
+        if (count>1 && show_label_f){
+            for (k in key_v){
+                e =  $('.'+k)
+                vals=key_v[k]
+                pts = e.attr('points')
+                // console.log(pts)
+                xy =pts.split(' ')[0].split(',')
+                $('.svg_show').append('<div class="'+e.attr("class")+'" style="font-size:10px;position:  absolute;top: '+xy[1]+'px;left:'+xy[0]+'px">'+JSON.stringify(vals)+'</div>')
+
+            }
+
+        }
+
+        $("polygon").click(function () {
+            // alert($(this).attr("class"))
+            var vals = [];
+            $(":checked").each(function (index, item) {
+                vals.push($(this).next().text());
+            });
+            key_v[$(this).attr("class")]=vals
+
+            xy = $(this).attr('points').split(' ')[0].split(',')
+            $('.svg_show').append('<div class="'+$(this).attr("class")+'" style="font-size:40px;position:  absolute;top: '+xy[1]+'px;left:'+xy[0]+'px">'+JSON.stringify(vals)+'</div>')
+
+            console.log(key_v)
+            elemts.push($(this))
+            $(this).hide()
+            $('div.'+$(this).attr("class")).remove()
+        })
+
+    }
+
+
+    $(function () {
+        wscmd = new WebSocket("ws://192.168.210.107:8181/cmd/on");
+        wscmd.onopen = function(){
+            console.log("open");
+            // wscmd.send('{"module":{"name":"label_images_titles","arg":{"path":"data1/lds-christchurch-post-earthquake-01m-urban-aerial-photos-24-febr-GTiff/BW233950","pape_num":0}}}')
+        }
+        wscmd.onmessage = function (data) {
+            index = -1
+            console.log("接受数据")
+            
+            console.log(data.data.length)
+            data0 = JSON.parse(data.data)
+            console.log(data0)
+            index = index + 1
+            show_svg(data0[index])
+            
+        }
+
+
+        $(".btn").click(function(){
+            
+            if(index%10==9) {
+                index = -1
+                pape_num += 10
+                wscmd.send('{"module":{"name":"label_images_titles","arg":{"path":"'+$("#data_input").val()+'","pape_num":' + pape_num + ',"zoom":'+$("#zoom_input").val()+'}}}')
+                wscmd.onmessage = function (data) {
+                console.log("接受数据")
+                console.log(data.data.length)
+                data0 = JSON.parse(data.data)
+                console.log(data0)
+                index = index + 1
+                show_svg(data0[index])
+                
+            }
+                
+            }else {
+                key_v={}
+                index = index + 1
+                show_svg(data0[index])
+                
+
+            }
+        });
+
+        $(".btn1").click(function(){
+            key_v={}
+            index = index-1
+            if (index<0){index=0}
+
+            show_svg(data0[index])
+            
+        });
+
+        $(".btn2").click(function(){
+            key_vs = JSON.stringify(key_v)
+            wscmd.send('{"module":{"name":"label_images_titles","arg":{"save":"'+data0[index][2]+'","value":'+key_vs+'}}}')
+            wscmd.onmessage = function (data) {
+                 if(index%10==9) {
+                index = -1
+                pape_num += 10
+                wscmd.send('{"module":{"name":"label_images_titles","arg":{"path":"'+$("#data_input").val()+'","pape_num":' + pape_num + ',"zoom":'+$("#zoom_input").val()+'}}}')
+                wscmd.onmessage = function (data) {
+                console.log("接受数据")
+                console.log(data.data.length)
+                data0 = JSON.parse(data.data)
+                console.log(data0)
+                index = index + 1
+                show_svg(data0[index])
+            }
+                
+            }else {
+                key_v={}
+                index = index + 1
+                show_svg(data0[index])
+                
+
+            }
+            }
+        });
+
+        $(".btn3").click(function(){
+            if (show_label_f){
+                show_label_f=false
+            }else {
+                show_label_f=true
+            }
+            key_v={}
+            show_svg(data0[index])
+
+        });
+
+        $(".btn4").click(function(){
+            key_v={}
+            data0[index][3]={}
+            show_svg(data0[index])
+
+        });
+
+        $(".search").click(function(){
+            alert($("#data_input").val())
+            wscmd.send('{"module":{"name":"label_images_titles","arg":{"path":"'+$("#data_input").val()+'","pape_num":0,"zoom":'+$("#zoom_input").val()+'}}}')
+
+        });
+
+        show_label(labels)
+
+        $("body").keydown(function (d) {
+            if(d.which==65){
+                e = elemts.pop()
+                e.show()
+
+                vals = key_v[e.attr("class")]
+
+                xy = e.attr('points').split(' ')[0].split(',')
+                $('.svg_show').append('<div class="'+e.attr("class")+'" style="font-size:40px;position:  absolute;top: '+xy[1]+'px;left:'+xy[0]+'px">'+JSON.stringify(vals)+'</div>')
+
+                // $('.'+e.attr("class")).show()
+                // alert(e.which)
+            }
+            return
+        })
+
+
+
+    })
+
+function show_label(data) {
+    context = '<div style="width:100%">'
+
+    for (k in data){
+        k=data[k]
+        context += '<ul class="list-group" style="float: left"><li class="list-group-item">'+
+            '<input class="form-check-input me-1" type="checkbox" value="" >'+
+            '<label class="form-check-label">'+k+'</label>'+
+            '</li></ul>'
+    }
+
+    context += '<ul class="list-group" style="float: left"><li class="list-group-item">'+
+        '<input id ="inputid" class="form-check-input me-1" type="input" value="" >'+
+        '<button id="addlabel" class="form-check-label">添加</button>'+
+        '</li></ul>'
+
+    context+='</div>'
+
+    $(".sild_show").html(context)
+
+    $("#addlabel").click(function () {
+        labels.push($("#inputid").val())
+        alert($("#inputid").val())
+        show_label(labels)
+    })
+
+    return context
+}
+
+</script>
+</html>

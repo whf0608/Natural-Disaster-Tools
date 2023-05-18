@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no' />
+  <meta http-equiv="Access-Control-Allow-Origin" content="*" />
+  <title>Building damage visualizer</title>
+
+  <link href="css/leaflet.css" rel="stylesheet" />
+  <link href="css/easy-button.css" rel="stylesheet" />
+  <link href="css/font-awesome.min.css" rel="stylesheet" />
+<!--  <link href="css/noty.css" rel="stylesheet" />-->
+  <link href="css/leaflet.draw.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+        integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI="
+        crossorigin=""/>
+  <script src="js/jquery.min.js"></script>
+
+
+  <script src="https://cdn.bootcss.com/proj4js/2.4.3/proj4.js"></script>
+  <!-- Make sure you put this AFTER Leaflet's CSS -->
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+          integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM="
+          crossorigin=""></script>
+
+  <script src="https://cdn.bootcss.com/proj4leaflet/1.0.1/proj4leaflet.min.js"></script>
+  <script src="js/tileLayer.baidu.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+  <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+
+  <style>
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+    button{
+      width: 100px;
+      height: 40px;
+      border-radius: 5px;
+      background-color: rgba(0,100,0,0.2);
+      border: #ff9200;
+      font-size: medium;
+      height: 30px;
+    }
+  </style>
+
+</head>
+<body>
+<div id = "map" style = "width:100%; height:100%;"></div>
+<div style="position: absolute;top: 15px;right: 150px;z-index: 401;">
+  <button type="button" id="getpoints">LoadPoints</button>
+  <button type="button" id="getpoints1">LoadPoint</button>
+  <button type="button" id="getgeojson">LoadLabel</button>
+  <button type="button" onclick="getBbox();">GetData</button>
+  <button type="button" onclick="downloaddata();">DownData</button>
+<!--  <li><a href="labeling_tiles.html">LabelsTools</a></li>-->
+  <button type="button"> <a href="map_and_label.html">LabelsTools</a></button>
+  <div id="show_data" style="width: 150px"></div>
+</div>
+
+
+</body>
+
+<script>
+
+  var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          osmAttrib = '&copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          osm = L.tileLayer(osmUrl, { maxZoom: 21, attribution: osmAttrib }),
+          map = new L.Map('map', { center: new L.LatLng(20,0), zoom: 3}),
+          drawnItems = L.featureGroup().addTo(map);
+  L.control.layers({
+            'osm': osm.addTo(map),
+            "google": L.tileLayer('http://www.google.cn/maps/vt?lyrs=s@189&gl=cn&x={x}&y={y}&z={z}', {maxZoom: 21}),
+            '高德影像': L.tileLayer('https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',{maxZoom: 21}),
+            'Christchurch': L.tileLayer('https://tiles-cdn.koordinates.com/services;key=c8c134e87d854b0b82ede5e566a619c5/tiles/v4/layer=53451,style=auto/{z}/{x}/{y}.png',{maxZoom: 21}),
+            'NetherlandsDEM': L.tileLayer('https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/352d65a86a34b3187b350a30b1ff316e-a9db5cdb6d4ed2dff76213b4130250d9/tiles/{z}/{x}/{y}',{maxZoom: 21}),
+            'Sentinel': L.tileLayer('https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/352d65a86a34b3187b350a30b1ff316e-a9db5cdb6d4ed2dff76213b4130250d9/tiles/{z}/{x}/{y}',{maxZoom: 21}),
+            'MODIS': L.tileLayer('https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/e3e1e34d40db5ada860d0589087d8d86-321ea68751edfbcef19f601052b17ecb/tiles/{z}/{x}/{y}',{maxZoom: 21}),
+            '夜灯光': L.tileLayer('https://gitc-c.earthdata.nasa.gov/wmts/epsg4326/best/wmts.cgi?TIME=2023-03-20T00:00:00Z&layer=VIIRS_SNPP_DayNightBand_At_Sensor_Radiance&style=default&tilematrixset=500m&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image%2Fpng&TileMatrix={z}&TileCol={x}&TileRow={y}',{maxZoom: 21}),
+            'arcgis': L.tileLayer('https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom: 21}),
+            'wayback_202207': L.tileLayer('https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/13851/{z}/{y}/{x}',{maxZoom: 21}),
+            'wayback_202202': L.tileLayer('https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/26083/{z}/{y}/{x}',{maxZoom: 21}),
+            'wayback_202104': L.tileLayer('https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/15423/{z}/{y}/{x}',{maxZoom: 21}),
+            'wayback_202105': L.tileLayer('https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/27659/{z}/{y}/{x}',{maxZoom: 21}),
+            'wayback_2014': L.tileLayer('https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/10/{z}/{y}/{x}',{maxZoom: 21}),
+            'wayback_201706': L.tileLayer('https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/19/{z}/{y}/{x}',{maxZoom: 21}),
+            'wayback_201708': L.tileLayer('https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/25379/{z}/{y}/{x}',{maxZoom: 21}),
+            'wayback_2020': L.tileLayer('https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/default028mm/MapServer/tile/18289/{z}/{y}/{x}',{maxZoom: 21}),
+            'mapbox': L.tileLayer('https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}.webp?sku=1016X6EPiJTTk&access_token=tk.eyJ1Ijoid2FuZ2hhaWZlbmcxMjMiLCJleHAiOjE2ODQzODQ4NjAsImlhdCI6MTY4NDM4MTI1OSwic2NvcGVzIjpbImVzc2VudGlhbHMiLCJzY29wZXM6bGlzdCIsIm1hcDpyZWFkIiwibWFwOndyaXRlIiwidXNlcjpyZWFkIiwidXNlcjp3cml0ZSIsInVwbG9hZHM6cmVhZCIsInVwbG9hZHM6bGlzdCIsInVwbG9hZHM6d3JpdGUiLCJzdHlsZXM6dGlsZXMiLCJzdHlsZXM6cmVhZCIsImZvbnRzOmxpc3QiLCJmb250czpyZWFkIiwiZm9udHM6d3JpdGUiLCJzdHlsZXM6d3JpdGUiLCJzdHlsZXM6bGlzdCIsInN0eWxlczpkb3dubG9hZCIsInN0eWxlczpwcm90ZWN0IiwidG9rZW5zOnJlYWQiLCJ0b2tlbnM6d3JpdGUiLCJkYXRhc2V0czpsaXN0IiwiZGF0YXNldHM6cmVhZCIsImRhdGFzZXRzOndyaXRlIiwidGlsZXNldHM6bGlzdCIsInRpbGVzZXRzOnJlYWQiLCJ0aWxlc2V0czp3cml0ZSIsImRvd25sb2FkczpyZWFkIiwidmlzaW9uOnJlYWQiLCJ2aXNpb246ZG93bmxvYWQiLCJuYXZpZ2F0aW9uOmRvd25sb2FkIiwib2ZmbGluZTpyZWFkIiwib2ZmbGluZTp3cml0ZSIsInN0eWxlczpkcmFmdCIsImZvbnRzOm1ldGFkYXRhIiwic3ByaXRlLWltYWdlczpyZWFkIiwiZGF0YXNldHM6c3R1ZGlvIiwiY3VzdG9tZXJzOndyaXRlIiwiY3JlZGVudGlhbHM6cmVhZCIsImNyZWRlbnRpYWxzOndyaXRlIiwiYW5hbHl0aWNzOnJlYWQiXSwiY2xpZW50IjoibWFwYm94LmNvbSIsImxsIjoxNjU4ODkzMDUxMDU2LCJpdSI6bnVsbCwiZW1haWwiOiJ3aGYyMDA2MDhAMTYzLmNvbSJ9.aEzc0rWYMqS1CQ0PQcb6JQ',{maxZoom: 21}),
+            'mapquest': L.tileLayer('https://1.aerial.maps.ls.hereapi.com/maptile/2.1/maptile/newest/satellite.day/{z}/{y}/{x}/256/jpg?apiKey=aRrXMN6rNeDunujbIgCqESvkttKlk4Pp2',{maxZoom: 21}),
+            '高德矢量': L.tileLayer('http://wprd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&style=7&x={x}&y={y}&z={z}',{maxZoom: 21}),
+            'google 矢量': L.tileLayer('http://mt2.google.cn/vt/lyrs=m&scale=2&hl=zh-CN&gl=cn&x={x}&y={y}&z={z}',{maxZoom: 21}),
+            'uiowa高程': L.tileLayer('http://cawm.lib.uiowa.edu/tiles/{z}/{x}/{y}.png',{maxZoom: 21}),
+            '高德路网': L.tileLayer('https://wprd01.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=2&style=8&ltype=11',{maxZoom: 21}),
+            'google 路网': L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}',{maxZoom: 21}),
+            'google 标注': L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',{maxZoom: 21}),
+            'google 地形': L.tileLayer('https://mt1.google.com/vt/lyrs=t&x={x}&y={y}&z={z}',{maxZoom: 21}),
+            'google 矢量': L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}',{maxZoom: 21}),
+            // '街景地图': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom: 21}),
+            '天地影像': L.tileLayer('https://t0.tianditu.gov.cn/img_w/wmts?tk=a1b7caf1339872193e81bd5cfdfcd882&SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&transparent=true&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',{maxZoom: 21}),
+            '天地矢量': L.tileLayer('https://tile0.tianditu.gov.cn/vts?t=vt&z={z}&x={x}&y={y}&tk=a1b7caf1339872193e81bd5cfdfcd882',{maxZoom: 21}),
+            '腾讯矢量': L.tileLayer('http://rt0.map.gtimg.com/realtimerender?z={z}&x={x}&y={-y}&type=vector&style=0',{maxZoom: 21}),
+          },
+          { 'drawlayer': drawnItems },
+          { position: 'topright', collapsed: false }
+  ).addTo(map);
+
+  map.pm.addControls({
+    position: 'topleft',
+    drawCircle: false,
+  });
+
+  connect = function () {
+    wsmodel = new WebSocket("ws://192.168.210.107:8181/cmd/on");
+    wsmodel.onopen = function(){
+      $("#server").css("background-color", "#5cb85c")
+    }
+    wsmodel.onclose = function(e){
+      $(".server").css("background-color", "#c9302c")
+      console.log("cline success");
+    }
+    wsmodel.onerror = function(e){
+      $(".server").css("background-color", "#c9302c")
+    }
+    return wsmodel
+  }
+  wscmd = connect()
+
+  getBbox = function () {
+    self_drawn = map.pm.getGeomanDrawLayers(true).toGeoJSON()
+    // console.log(self_drawn)
+    c = self_drawn.features[0].geometry.coordinates[0]
+
+    if (wscmd.OPEN) {
+      alert('{"module":{"name":"tif_loc","arg":['+c[0][1]+','+ c[2][1]+','+ c[0][0]+','+ c[2][0]+']}}')
+      wscmd.send('{"module":{"name":"tif_loc","arg":['+c[0][1]+','+ c[2][1]+','+ c[0][0]+','+ c[2][0]+']}}')
+      wscmd.onmessage = function (data) {
+        context = '<div style="width:100%">'
+        // alert(data)
+        data = JSON.parse(data.data)
+        data = data['features']
+        for (k in data){
+          console.log(data[k])
+          context += '<ul class="list-group" style="float: left"><li class="list-group-item">'+
+                  '<input class="form-check-input me-1" type="checkbox" value="" >'+
+                  '<label class="form-check-label">'+data[k]['properties']['name']+'</label>'+
+                  '</li></ul>'
+        }
+        context+='</div>'
+
+        $("#show_data").html(context)
+      }
+    }else {
+      wscmd = connect()
+    }
+  }
+
+  downloaddata = function () {
+    alert("downdata")
+  }
+
+$(function () {
+  $("#getgeojson").click(function () {
+    geojson = map.pm.getGeomanDrawLayers(true).toGeoJSON()
+    coord={}
+    coord['coordinates']=geojson.features[0].geometry.coordinates[0]
+    zoom = map.getZoom()
+    coord["zoom"]=zoom
+    console.log(coord)
+    wscmd.send('{"module":{"name":"osm2geojson","arg":['+JSON.stringify(coord)+']}}')
+    wscmd.onmessage=function (d) {
+        response = JSON.parse(d.data)
+        myLayer = L.geoJSON().addTo(map);
+        myLayer.addData(response);
+    }
+  })
+
+  $("#getpoints").click(function () {
+    $.ajax({
+      url: "./configs/point0.json",
+      async: false,
+      type: 'get',
+      dataType: 'json',
+      success: function (response) {
+
+        response["features"].forEach(function (d) {
+          coordinates = d["geometry"]["coordinates"]
+          if (coordinates.length==2){
+            c = coordinates [0]
+            coordinates [0]= coordinates [1]
+            coordinates [1] =c
+          }else {
+           coordinates.forEach(function (c0) {
+             c=c0[0]
+             c0[0]=c0[1]
+             c0[1]=c
+           })
+          }
+        })
+        myLayer = L.geoJSON().addTo(map);
+        myLayer.addData(response);
+      }
+  })
+  })
+
+  $("#getpoints1").click(function () {
+    $.ajax({
+      url: "./configs/point.json",
+      async: false,
+      type: 'get',
+      dataType: 'json',
+      success: function (response) {
+        myLayer = L.geoJSON().addTo(map);
+        myLayer.addData(response);
+      }
+    })
+  })
+
+})
+
+</script>
+</html>

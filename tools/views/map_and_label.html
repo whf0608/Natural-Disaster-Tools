@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no' />
+  <meta http-equiv="Access-Control-Allow-Origin" content="*" />
+  <title>Building damage visualizer</title>
+
+  <link href="css/leaflet.css" rel="stylesheet" />
+<!--  <link href="css/easy-button.css" rel="stylesheet" />-->
+  <link href="css/font-awesome.min.css" rel="stylesheet" />
+<!--  <link href="css/noty.css" rel="stylesheet" />-->
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+  <link href="js/bootstrap.min.css">
+    <!--  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"-->
+<!--        integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI="-->
+<!--        crossorigin=""/>-->
+  <script src="js/jquery.min.js"></script>
+ <script src="js/jquery-3.3.1.min.js"></script>
+ <script src="js/bootstrap.min.js"></script>
+ <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.7/dist/umd/popper.min.js" integrity="sha384-zYPOMqeu1DAVkHiLqWBUTcbYfZ8osu1Nd6Z89ify25QV9guujx43ITvfi12/QExE" crossorigin="anonymous"></script>
+  <script src="https://cdn.bootcss.com/proj4js/2.4.3/proj4.js"></script>111
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+          integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM="
+          crossorigin=""></script>
+  <script src="https://cdn.bootcss.com/proj4leaflet/1.0.1/proj4leaflet.min.js"></script>
+  <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+  <script src="js/labels.js"></script>
+
+  <style>
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+    button{
+        width: 100px;
+        height: 40px;
+        border-radius: 5px;
+        background-color: rgba(0,100,0,0.5);
+        border: #ff9200;
+        font-size: medium;
+    }
+
+  </style>
+
+</head>
+<body>
+<div style="position: absolute;top: 15px;right: 150px;z-index: 401;">
+    <button type="button"  class="server" >Server</button>
+    <button type="button"  id="getosmjson">LoadOsm</button>
+    <button type="button"  id="modeldetection">ModelPre</button>
+    <button type="button"  id="datalabeling">DataLabel</button>
+    <button type="button"  id="showdata">ShowData</button>
+    <div id="show_data" style="width: 150px"></div>
+</div>
+
+<div id = "map" style = "width:100%; height:100%;"></div>
+
+<div id='label_tools' style="position: absolute;width: 100%;height: 100%;background-color: rgba(255,255,255,0.7); top:20px;left: 10px; z-index: 1001;">
+<div class="img_show" style="width: 100%;height: 100%;position: absolute; top: 20px;left: 50px">
+</div>
+<div class="svg_show" style="position: absolute;top: 20px;left: 50px">
+</div>
+<div class="sild_show" style="position: fixed;top: 5%;width: 250px;right: 10px">
+</div>
+<!--<input id="data_input" class="form-control" placeholder="" style="position:fixed;top:10%;right: 50px;width: 50%;height: 30px">-->
+<!--<input id="zoom_input" class="form-control" placeholder="20" style="position:fixed;top:15%;right: 150px;">-->
+<button class="close"  style="position:fixed;top:70%;right: 150px">Close</button>
+<button class="server" style="position:fixed;top:70%;right: 50px">Server</button>
+<button class="next"  style="position: fixed;top: 70%">Next</button>
+<button class="up"  style="position: fixed;top: 70%;left: 200px">Up</button>
+<button class="save"  style="position: fixed;top: 70%;left: 400px">Save</button>
+<button class="showlabel"  style="position: fixed;top: 70%;left: 600px">ShowLabel</button>
+<button class="clear"  style="position: fixed;top: 70%;left: 800px">Clear</button>
+</div>
+
+</body>
+<script>
+$(function () {
+  r = map_init();
+  map = r[0]
+    map_config = r[1]
+    wscmd = connect();
+
+  $(".server").click(function () {
+      wscmd = connect();
+  })
+
+  $("#getosmjson").click(function () {
+    var geojson = map.pm.getGeomanDrawLayers(true).toGeoJSON()
+    var coord={'coordinates':geojson.features[0].geometry.coordinates[0],"zoom":map.getZoom()}
+    wscmd.send('{"module":{"name":"osm2geojson","arg":['+JSON.stringify(coord)+']}}');
+
+    $("#getosmjson").css("background-color","rgba(243,9,27,0.5)")
+    $("#getosmjson").attr("disabled",true);
+
+    wscmd.onmessage=function (d) {
+        var response = JSON.parse(d.data)
+        var myLayer = L.geoJSON().addTo(map);
+        myLayer.addData(response);
+        $("#getosmjson").css("background-color","rgba(0,100,0,0.5)");
+        $("#getosmjson").attr("disabled",false);
+    }
+  })
+    
+$("#modeldetection").click(function () {
+    var geojson = map.pm.getGeomanDrawLayers(true).toGeoJSON()
+    var coord={'coordinates':'',"zoom":map.getZoom(),"path": map_config["preImageryLayer"]["basemapURL"].split('{')[0]}
+    if (geojson.features.length==0){
+        coord['coordinates']=''
+    }else {
+        coord['coordinates']=geojson.features[0].geometry.coordinates[0]
+    }
+
+    $("#modeldetection").css("background-color","rgba(243,9,27,0.5)")
+    $("#modeldetection").attr("disabled",true);
+    wscmd.send('{"module":{"name":"model2geojson","arg":['+JSON.stringify(coord)+']}}')
+    wscmd.onmessage=function (d) {
+        var response = JSON.parse(d.data)
+        var myLayer = L.geoJSON().addTo(map);
+        myLayer.addData(response);
+        myLayer.setStyle(function (feature) {
+
+            if (feature['properties']['class']['buildings']>0.50){
+                return {
+                    fillColor: 'red',
+                    weight: 1,
+                    opacity: 1,
+                    color: 'red',
+                    dashArray: '3',
+                    fillOpacity: 0.3
+                };
+            }
+            if (feature['properties']['class']['field']>0.5){
+                return {
+                    fillColor: 'green',
+                    weight: 1,
+                    opacity: 1,
+                    color: 'green',
+                    dashArray: '3',
+                    fillOpacity: 0.5
+                };
+            }
+
+            if (feature['properties']['class']['trees']>0.5){
+                return {
+                    fillColor: 'yellow',
+                    weight: 1,
+                    opacity: 1,
+                    color: 'yellow',
+                    dashArray: '3',
+                    fillOpacity: 0.5
+                };
+            }
+
+            return {
+                fillColor: 'white',
+                weight: 1,
+                opacity: 1,
+                color: 'white',
+                dashArray: '3',
+                fillOpacity: 0.5
+            }
+
+        })
+        $("#modeldetection").css("background-color","rgba(0,100,0,0.5)");
+        $("#modeldetection").attr("disabled",false);
+    }
+  })
+$("#label_tools").hide()
+    // $("#label_tools").show()
+
+    // $("#map").attr("disabled",false);
+$("#datalabeling").click(function () {
+    $("#label_tools").show()
+    labeling_init()
+    data0=[]
+    key_v={}
+    elemts=[]
+    index=0
+    pape_num=0
+    show_label_f=false
+    zoom=map.getZoom()
+    var geojson = map.pm.getGeomanDrawLayers(true).toGeoJSON()
+    var infoconfig={}
+    if (geojson.features.length==0){
+        infoconfig['coordinates']=''
+    }else {
+        infoconfig['coordinates']=geojson.features[0].geometry.coordinates[0]
+    }
+    infoconfig['path'] = map_config["preImageryLayer"]["basemapURL"].split('{')[0].split('//')[2]
+    infoconfig["pape_num"]=0
+    infoconfig["zoom"] = zoom
+    // $("#zoom_input").val()
+    wscmd.send('{"module":{"name":"label_images_titles","arg":'+JSON.stringify(infoconfig)+'}}')
+    wscmd.onmessage = function (data) {
+        data0 = JSON.parse(data.data)
+        console.log(data0)
+        show_svg(data0[index])
+        index = index + 1
+    }
+});
+  $(".close").click(function () {
+      $("#label_tools").hide()
+  })
+
+
+
+})
+
+</script>
+
+<script>
+
+    function show_svg(data) {
+        var c=''
+        var img_i=0
+        data[1].forEach(function (d) {
+            c+='<img src="'+d+'" style="position: absolute;left: '+256*(Math.trunc(img_i/4))+'px;top: '+256*(3-(img_i%4))+'px">'
+            img_i+=1
+        })
+        $(".img_show").html(c)
+        $(".svg_show").html(data[0])
+        $("svg").attr('opacity',0.3)
+
+        if (data[3]!=null){
+            var count=0
+            for (_ in data[3]){
+                count+=1
+            }
+            if (count>0){
+                key_v = data[3]
+            }
+        }
+        if (show_label_f){show_class_names(key_v)}
+
+        $("polygon").click(function () {
+            var vals = [];
+            $(".sild_show :checked").each(function (index, item) {
+                vals.push($(this).next().text());
+            });
+            key_v[$(this).attr("class")]=vals
+            // xy = $(this).attr('points').split(' ')[0].split(',')
+            // $('.svg_show').append('<div class="'+$(this).attr("class")+'" style="font-size:20px;position:  absolute;top: '+xy[1]+'px;left:'+xy[0]+'px">'+vals[0]+'</div>')
+            elemts.push($(this))
+            $(this).hide()
+            // $('div.'+$(this).attr("class")).remove()
+        })
+    }
+
+    $(function () {
+        $(".next").click(function(){
+            if(index%10==0) {
+                index = 0
+                pape_num += 10
+                zoom=map.getZoom()
+                var geojson = map.pm.getGeomanDrawLayers(true).toGeoJSON()
+                var infoconfig={}
+                if (geojson.features.length==0){
+                    infoconfig['coordinates']=''
+                }else {
+                    infoconfig['coordinates']=geojson.features[0].geometry.coordinates[0]
+                }
+                infoconfig['path'] = map_config["preImageryLayer"]["basemapURL"].split('{')[0].split('//')[2]
+                infoconfig["pape_num"]=pape_num
+                infoconfig["zoom"] = zoom
+                wscmd.send('{"module":{"name":"label_images_titles","arg":'+JSON.stringify(infoconfig)+'}}')
+
+                wscmd.onmessage = function (data) {
+                data0 = JSON.parse(data.data)
+                show_svg(data0[index])
+                index = index + 1
+            }
+            }else {
+                // alert(index)
+                key_v={}
+                show_svg(data0[index])
+                index = index + 1
+            }
+        });
+        $(".up").click(function(){
+            key_v={}
+            index = index-1
+            if (index<0){index=0}
+            show_svg(data0[index])
+        });
+
+        $(".save").click(function(){
+            key_vs = JSON.stringify(key_v)
+            wscmd.send('{"module":{"name":"label_images_titles","arg":{"save":"'+data0[index][2]+'","value":'+key_vs+'}}}')
+            wscmd.onmessage = function (data) {
+               if(index%10==0) {
+                index = 0
+                pape_num += 10
+                wscmd.send('{"module":{"name":"label_images_titles","arg":{"path":"'+$("#data_input").val()+'","pape_num":' + pape_num + ',"zoom":'+$("#zoom_input").val()+'}}}')
+                wscmd.onmessage = function (data) {
+                data0 = JSON.parse(data.data)
+                console.log(data0)
+                show_svg(data0[index])
+                index = index + 1
+            }
+                
+            }else {
+                key_v={}
+                show_svg(data0[index])
+                index = index + 1
+            }}
+        });
+
+        $(".showlabel").click(function(){
+            if (show_label_f){
+                show_label_f=false
+            }else {
+                show_label_f=true
+            }
+            key_v={}
+            show_svg(data0[index])
+        });
+
+        $(".clear").click(function(){
+            key_v={}
+            data0[index][3]={}
+            show_svg(data0[index])
+        });
+
+        $("body").keydown(function (d) {
+            if(d.which==65){
+                e = elemts.pop()
+                e.show()
+                $(""+e.attr("class")).show()
+                var vals = key_v[e.attr("class")]
+                var xy = e.attr('points').split(' ')[0].split(',')
+                $('.svg_show').append('<div class="'+e.attr("class")+'" style="font-size:20px;position:  absolute;top: '+xy[1]+'px;left:'+xy[0]+'px">'+vals[0]+'</div>')
+            }
+            return
+        })
+
+    })
+
+
+</script>
+</html>

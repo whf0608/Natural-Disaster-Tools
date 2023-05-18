@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <link href="js/bootstrap.min.css">
+    <script src="js/jquery.min.js"></script>
+	<script src="js/bootstrap.min.js"></script>
+    <script src="js/jquery-3.6.3.min.js"></script>
+	<script src="https://d3js.org/d3.v5.min.js"></script>
+	<style>
+		img{width: 100px;height: 100px}
+		.dataset{padding: 10px}
+	</style>
+</head>
+<body>
+<nav class="navbar navbar-default" role="navigation">
+	<div class="container-fluid">
+	<div class="navbar-header">
+		<button type="button" class="navbar-toggle" data-toggle="collapse"
+				data-target="#example-navbar-collapse">
+			<span class="sr-only">导航</span>
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+			<span class="icon-bar"></span>
+		</button>
+		<a class="navbar-brand" href="index.html">导航</a>
+	</div>
+	<div class="collapse navbar-collapse" id="example-navbar-collapse">
+		<ul class="nav navbar-nav">
+			<li><a href="index.html">Datasets</a></li>
+			<li><a href="model.html">Models</a></li>
+			<li class="active"><a href="seach.html">Search</a></li>
+			<li><a href="map.html">Map</a></li>
+			<li><a href="labeling_tiles.html">LabelsTools</a></li>
+			<li > <a id="server" class="rounded-pill" style="margin-left: 100px">Server</a></li>
+
+		</ul>
+	</div>
+	</div>
+</nav>
+
+<div style="">
+	<label></label>
+	<input id="lat_input" class="form-control" placeholder="Data lat" style="margin-bottom: 20px"></input>
+	<input id="lon_input" class="form-control" placeholder="Data lon" style="margin-bottom: 20px"></input>
+	<button id="send" type="button" class="btn btn-primary">search</button>
+	<button id="data_send" type="button" class="btn btn-primary" style="margin-left: 50px">data cls</button>
+	<button id="data_send1" type="button" class="btn btn-primary" style="margin-left: 50px">data names</button>
+	<button id="data_send2" type="button" class="btn btn-primary" style="margin-left: 50px">vis loc</button>
+</div>
+
+<!--<iframe align="center" width="100%" height="600px" src="index5.html"  frameborder="no" border="0" marginwidth="0" marginheight="0" scrolling="no"></iframe>-->
+<div id="show_data" style="padding-top: 50px"></div>
+
+</body>
+<script>
+
+	connect = function () {
+		wsmodel = new WebSocket("ws://192.168.210.107:8181/cmd/on");
+		wsmodel.onopen = function(){
+			$("#server").css("background-color", "#5cb85c")
+		}
+		wsmodel.onclose = function(e){
+			$(".server").css("background-color", "#c9302c")
+			console.log("cline success");
+		}
+		wsmodel.onerror = function(e){
+			$(".server").css("background-color", "#c9302c")
+		}
+		return wsmodel
+	}
+
+
+$(document).ready(function(){
+	wscmd = connect()
+	$("#send").click(function(){
+		if (wscmd.OPEN) {
+			alert($("#lat_input").val(),$("#lon_input").val())
+			wscmd.send('{"module":{"name":"tif_loc","arg":['+$("#lat_input").val()+','+$("#lon_input").val()+']}}')
+			wscmd.onmessage = function (data) {
+				context = ''
+				alert(data)
+				data = JSON.parse(data.data)
+				data.forEach(function(d){
+					context += '<div> name:'+d["name"]+'</div>'+'<div> geometry:'+d["geometry"]+'</div>'+'<div>address:'+d["address"]+'</div>'+'<div>Centroid:'+d["Centroid"]+'</div>'
+				})
+				$("#show_data").html(context)
+			}
+		}
+	  });
+
+	$("#data_send").click(function(){
+		if (wscmd.OPEN) {
+			var vals = [];
+			$(":checked").each(function (index, item) {
+				vals.push($(this).next().text());
+			});
+
+			flg='cls'
+			wscmd.send('{"module":{"name":"db_tif","arg":{"names":"'+flg+'","use_data":'+JSON.stringify(vals)+'}}}')
+			wscmd.onmessage = function (data) {
+				context = '<div style="width:100%">'
+				// alert(data)
+				data = JSON.parse(data.data)
+				for (k in data){
+					context += '<ul class="list-group" style="float: left"><li class="list-group-item">'+
+						'<input class="form-check-input me-1" type="checkbox" value="" >'+
+						'<label class="form-check-label">'+k+'</label>'+
+						'</li></ul>'
+					// '<div class="element"><button type="button" class="btn btn-success" style="margin: 10px">'+k+'</button> X</div>'
+				}
+				context+='</div>'
+
+				$("#show_data").html(context)
+			}
+		}
+
+	});
+
+	$("#data_send1").click(function(){
+		if (wscmd.OPEN) {
+			var vals = [];
+			$(":checked").each(function (index, item) {
+				vals.push($(this).next().text());
+			});
+
+			flg='names'
+			wscmd.send('{"module":{"name":"db_tif","arg":{"names":"'+flg+'","use_data":'+JSON.stringify(vals)+'}}}')
+			wscmd.onmessage = function (data) {
+				context = '<div style="width:100%">'
+				// alert(data)
+				data = JSON.parse(data.data)
+				for (k in data){
+					context += '<ul class="list-group" style="float: left"><li class="list-group-item">'+
+							'<input class="form-check-input me-1" type="checkbox" value="" >'+
+							'<label class="form-check-label">'+k+'</label>'+
+							'</li></ul>'
+					// '<div class="element"><button type="button" class="btn btn-success" style="margin: 10px">'+k+'</button> X</div>'
+				}
+				context+='</div>'
+
+				$("#show_data").html(context)
+			}
+		}
+
+	});
+
+	$("#data_send2").click(function(){
+		if (wscmd.OPEN) {
+			var vals = [];
+			$(":checked").each(function (index, item) {
+				vals.push($(this).next().text());
+			});
+
+			flg='names'
+			wscmd.send('{"module":{"name":"db_tif","arg":{"dataset_names":"'+flg+'","use_data":'+JSON.stringify(vals)+'}}}')
+			wscmd.onmessage = function (data) {
+				window.location.replace('http://localhost:63343/valite_dataset_sys/map.html')
+				// context = '<div style="width:100%">'
+				// alert(data)
+				// data = JSON.parse(data.data)
+				// for (k in data){
+				// 	context += '<ul class="list-group" style="float: left"><li class="list-group-item">'+
+				// 			'<input class="form-check-input me-1" type="checkbox" value="" >'+
+				// 			'<label class="form-check-label">'+k+'</label>'+
+				// 			'</li></ul>'
+				// 	// '<div class="element"><button type="button" class="btn btn-success" style="margin: 10px">'+k+'</button> X</div>'
+				// }
+				// context+='</div>'
+				//
+				// $("#show_data").html(context)
+			}
+		}
+
+	});
+
+	$(".server").click(function (){
+		wscmd=connect()
+	})
+});
+
+
+
+</script>
+</html>
+
+<!--<svg width="1500" height="1000"></svg>-->
+<!--<script>-->
+<!--	var marge = {top:60,bottom:60,left:60,right:60}-->
+<!--	var svg = d3.select("svg")-->
+<!--	var width = svg.attr("width")-->
+<!--	var height = svg.attr("height")-->
+<!--	var g = svg.append("g").attr("transform","translate("+marge.top+","+marge.left+")");-->
+<!--	//投影函数-->
+<!--	var projection = d3.geoMercator()-->
+<!--			.center([107, 31])-->
+<!--			.scale(700)-->
+<!--			.translate([width/2, height/2]);-->
+<!--	//路径-->
+<!--	var path = d3.geoPath(projection);-->
+<!--	var color = d3.schemeCategory10;-->
+
+<!--	d3.json("./configs/100000_full.json").then(function(data){-->
+<!--		console.log(data)-->
+<!--		svg.selectAll("g")-->
+<!--				.data(data.features)-->
+<!--				.enter()-->
+<!--				.append("g")-->
+<!--				.append("path")-->
+<!--				.attr('d',path)//使用地理路径生成器-->
+<!--				.attr("stroke","#000")-->
+<!--				.attr("stroke-width",1)-->
+<!--				.attr("fill", function(d,i){-->
+<!--					return color[i%10];-->
+<!--				})-->
+<!--				.on("mouseover",function(d,i){-->
+<!--					d3.select(this).attr('opacity', 0.5);-->
+<!--				})-->
+<!--				.on("mouseout",function(d,i){-->
+<!--					d3.select(this).attr('opacity', 1);-->
+<!--				});-->
+<!--		//添加坐标-->
+<!--		svg.selectAll("g")-->
+<!--				.append('text')-->
+<!--				.attr('font-size', 12)-->
+<!--				.attr('text-anchor', 'middle')-->
+<!--				.attr('x', d => {-->
+<!--					var position = projection(d.properties.centroid || [0, 0]);-->
+<!--					return position[0];-->
+<!--				})-->
+<!--				.attr('y', d => {-->
+<!--					var position = projection(d.properties.centroid || [0, 0]);-->
+<!--					return position[1];-->
+<!--				})-->
+<!--				.attr('dy', d => {-->
+<!--					//这里为什么这么写呢，因为澳门和香港重合了，挤到一起了。-->
+<!--					if (d.properties.name === '澳门') {-->
+<!--						return 15;-->
+<!--					}-->
+<!--				})-->
+<!--				.text(d => d.properties.name);-->
+
+<!--	})-->
+<!--</script>-->
