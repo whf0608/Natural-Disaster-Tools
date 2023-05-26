@@ -8,3 +8,5 @@
 
 
 
+# Technology
+## 1. [segment-anything](https://github.com/facebookresearch/segment-anything)
