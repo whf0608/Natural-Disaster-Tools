@@ -8,7 +8,7 @@
 ![img1](../images/004.png "")
 
 Data auto Annotation & Analyze
-![img1](../images/005.png "")
+![img1](../images/006.png "")
 
 1.4 Model Training
 ![img1](../images/002.png "")
