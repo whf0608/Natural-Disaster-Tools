@@ -1,5 +1,5 @@
 # Natural-Disaster-Tools
-![img1](images/2023-07-20-15-31-40.gif)
+![img1](images/2023-07-20-15-31-40.gif?raw=true)
 
 ### 1. [disaster_overview](disaster_overview.md)
 
